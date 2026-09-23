@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>电商直播数字人 V0</title>
+  <style>
+    :root{--bg:#070b14;--panel:#0e1729;--line:#22304a;--text:#f8fafc;--muted:#91a0b8;--blue:#2f6bff;--cyan:#16c7d9;--red:#ff4968;--green:#2fd18a}
+    *{box-sizing:border-box} body{margin:0;background:radial-gradient(circle at 70% -10%,#142a54 0,transparent 35%),var(--bg);color:var(--text);font-family:Inter,"Microsoft YaHei",system-ui,sans-serif}
+    button,input,textarea{font:inherit}.shell{max-width:1500px;margin:auto;padding:24px}.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.brand{display:flex;align-items:center;gap:13px}.logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,var(--blue),var(--cyan));display:grid;place-items:center;font-weight:900;box-shadow:0 12px 30px #2f6bff55}.brand h1{font-size:21px;margin:0}.brand p{font-size:12px;color:var(--muted);margin:4px 0 0}.version{border:1px solid #33517b;background:#12213b;padding:8px 13px;border-radius:999px;color:#a7c7ff;font-size:13px}
+    .grid{display:grid;grid-template-columns:430px 1fr;gap:20px}.card{background:linear-gradient(180deg,#101a2d,#0b1322);border:1px solid var(--line);border-radius:20px;box-shadow:0 18px 60px #0005}.controls{padding:20px;height:calc(100vh - 115px);min-height:680px;overflow:auto}.section-title{font-size:14px;font-weight:750;margin:0 0 15px;display:flex;gap:8px;align-items:center}.section-title span{width:25px;height:25px;border-radius:8px;background:#1d3153;display:grid;place-items:center;color:#74a3ff}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{margin-bottom:12px}.field.full{grid-column:1/-1}.field label{display:block;font-size:12px;color:#b4c0d4;margin-bottom:7px}.field input,.field textarea{width:100%;border:1px solid #273754;background:#08101e;color:#f8fafc;border-radius:10px;padding:11px 12px;outline:0;transition:.2s}.field input:focus,.field textarea:focus{border-color:#4f80ff;box-shadow:0 0 0 3px #2f6bff25}.field textarea{resize:vertical;min-height:74px}.script textarea{min-height:148px;line-height:1.7}.upload{border:1px dashed #37527e;border-radius:13px;background:#0a1425;padding:12px;display:flex;gap:12px;align-items:center;cursor:pointer}.upload img{width:74px;height:60px;object-fit:cover;border-radius:9px;background:#fff}.upload strong{font-size:13px}.upload small{display:block;color:var(--muted);margin-top:4px}.upload input{display:none}.divider{height:1px;background:var(--line);margin:19px 0}.primary{width:100%;border:0;color:white;background:linear-gradient(100deg,var(--blue),#6558ff);border-radius:12px;padding:13px;font-weight:750;cursor:pointer;box-shadow:0 10px 25px #2f6bff35}.primary:disabled,.control-btn:disabled{opacity:.42;cursor:not-allowed;box-shadow:none}
+    .stage-card{overflow:hidden;display:flex;flex-direction:column;min-width:0}.stage-head{height:64px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 20px}.live-title{display:flex;gap:9px;align-items:center;font-weight:700}.dot{width:9px;height:9px;border-radius:50%;background:#69778d}.dot.playing{background:var(--red);box-shadow:0 0 0 7px #ff496825;animation:pulse 1.2s infinite}.dot.ready{background:var(--green)}@keyframes pulse{50%{opacity:.45}}.status-pill{font-size:12px;color:#b9c6da;background:#18253a;border:1px solid #2c3e5b;border-radius:999px;padding:7px 11px}.stage-wrap{position:relative;flex:1;min-height:570px;background:#04070d;display:grid;place-items:center}.stage-wrap video{width:100%;height:100%;max-height:calc(100vh - 270px);object-fit:contain;background:#02050a}.empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 40%,#132848,#070b14 65%);text-align:center}.empty img{height:60%;max-width:55%;object-fit:contain;filter:drop-shadow(0 25px 30px #0008);border-radius:12px}.empty h2{margin:16px 0 7px;font-size:22px}.empty p{margin:0;color:var(--muted);font-size:13px}.progress{position:absolute;left:8%;right:8%;bottom:42px;display:none}.progress-track{height:7px;background:#26334a;border-radius:999px;overflow:hidden}.progress-bar{height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width .35s}.progress-text{text-align:center;margin-top:10px;color:#d8e4f7;font-size:13px}.stage-foot{padding:15px 20px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--line)}.control-btn{border:1px solid #2d3f5d;background:#162238;color:#e5edf9;border-radius:10px;padding:10px 18px;cursor:pointer}.control-btn.start{background:#1d5cff;border-color:#1d5cff}.control-btn.stop{color:#ff9aaa}.message{margin-left:auto;color:var(--muted);font-size:12px;max-width:43%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.embed-link{margin:0 20px 16px;padding:11px 13px;background:#08101e;border:1px solid #23334f;border-radius:10px;color:#8fa3c0;font-size:12px;display:none}.embed-link code{color:#79b2ff;user-select:all}.legacy{color:#8e9eb8;text-decoration:none;font-size:12px}.legacy:hover{color:white}
+    .danmaku-layer{position:absolute;left:18px;top:58px;z-index:5;display:flex;flex-direction:column;gap:7px;max-width:58%;pointer-events:none}.danmaku-item{align-self:flex-start;padding:6px 12px;border-radius:999px;background:#080d1eb8;color:#fff;font-size:12px;line-height:1.45;backdrop-filter:blur(8px);animation:danmakuIn .28s ease}.danmaku-item.host{background:#2f6bffd9}.danmaku-form{display:flex;gap:10px;padding:0 20px 16px}.danmaku-form input{flex:1;height:42px;padding:0 16px;border:1px solid #dce2ed;border-radius:999px;outline:0}.danmaku-form input:focus{border-color:#415fff;box-shadow:0 0 0 3px #415fff16}.danmaku-form button{padding:0 24px;border:0;border-radius:999px;background:#415fff;color:#fff;font-weight:700}.profile-upload{padding:10px 12px;border:1px dashed #ccd5e5;border-radius:11px;background:#f8faff;color:#667085;font-size:12px}.profile-upload input{margin-top:7px;width:100%;font-size:12px}@keyframes danmakuIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+    body{background:#f5f7fb;color:#171b2a}.shell{max-width:1460px}.topbar{background:#fff;border:1px solid #e3e7ef;border-radius:18px;padding:14px 18px;box-shadow:0 10px 35px #1f2b4d0b}.brand h1{color:#171b2a}.logo{background:linear-gradient(135deg,#415fff,#7585ff)}.version{background:#eef1ff;border-color:#dce2ff;color:#415fff}.grid{grid-template-columns:minmax(0,7fr) minmax(390px,5fr);align-items:start}.controls{order:2;height:calc(100vh - 122px);min-height:680px;background:#fff;border-color:#e1e6ef;box-shadow:0 12px 35px #2734520d}.stage-card{order:1;background:#fff;border-color:#e1e6ef;box-shadow:0 12px 35px #2734520d}.section-title{color:#1c2232}.section-title span{background:#eef1ff;color:#415fff}.field label{color:#697386}.field input,.field textarea{background:#f9fafc;border-color:#dfe4ed;color:#171b2a}.upload{background:#f8faff;border-color:#cbd4e5}.stage-head{border-color:#e6eaf1;color:#1d2433}.status-pill{background:#f1f4f8;border-color:#e0e5ee;color:#697386}.stage-wrap{aspect-ratio:16/9;min-height:0;background:radial-gradient(120% 120% at 20% 10%,#2a356e 0,#141a3d 55%,#0b0f26 100%)}.stage-wrap video{position:absolute;inset:0;max-height:none;object-fit:contain}.stage-foot{border-color:#e5e9f0}.control-btn{background:#fff;border-color:#dce2ec;color:#30384b}.embed-link{background:#f8faff;border-color:#e0e5ef}.legacy{color:#697386}
+    @media(max-width:1000px){.grid{grid-template-columns:1fr}.controls,.stage-card{order:initial}.controls{height:auto;min-height:0}.stage-wrap{min-height:420px}.stage-wrap video{max-height:none}.shell{padding:14px}}@media(max-width:560px){.fields{grid-template-columns:1fr}.stage-foot{flex-wrap:wrap}.message{width:100%;max-width:none;margin:4px 0 0}.topbar{align-items:flex-start}.version{display:none}.danmaku-layer{max-width:80%}}
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="topbar">
+    <div class="brand"><div class="logo">e</div><div><h1>eget · 数字人直播间</h1><p>真实数字人主播 · 商品讲解 · 弹幕实时回答</p></div></div>
+    <div style="display:flex;gap:14px;align-items:center"><a class="legacy" href="/studio">形象/声音实验室</a><div class="version">V0 基线版本</div></div>
+  </header>
+  <div class="grid">
+    <aside class="card controls">
+      <form id="liveForm">
+        <h2 class="section-title"><span>1</span>主播形象与声音</h2>
+        <div class="fields">
+          <label class="profile-upload field full">主播照片（可选，默认使用固定主播）<input type="file" name="portrait_image" accept="image/*"></label>
+          <label class="profile-upload field full">声音参考（可选，建议 5–15 秒清晰录音）<input type="file" name="reference_audio" accept="audio/*"></label>
+          <div class="field full"><label>参考录音文字（可选）</label><input name="reference_text" placeholder="填写后需与录音内容一致"></div>
+          <div class="field full"><label>表情模式</label><select name="expression_mode" style="width:100%;height:42px;border:1px solid #dfe4ed;border-radius:10px;padding:0 12px;background:#f9fafc"><option value="normal">正常表情</option><option value="funny">搞怪表情与动作</option></select></div>
+        </div>
+        <div class="divider"></div>
+        <h2 class="section-title"><span>2</span>商品资料</h2>
+        <div class="fields">
+          <div class="field full"><label>商品名称</label><input name="product_name" value="10000mAh 轻薄充电宝" required></div>
+          <div class="field"><label>原价</label><input name="original_price" value="99" required></div>
+          <div class="field"><label>直播活动价</label><input name="sale_price" value="79" required></div>
+          <div class="field full"><label>商品卖点</label><textarea name="selling_points">22.5W 快充；Type-C 双向快充；轻薄便携</textarea></div>
+          <div class="field full"><label>商品参数</label><textarea name="product_params">容量：10000mAh；接口：USB-A、Type-C；适合通勤和出差</textarea></div>
+          <div class="field full"><label>优惠信息</label><input name="promotion" value="直播间限时直降 20 元"></div>
+          <div class="field full"><label>商品图片</label><label class="upload"><img id="imagePreview" src="/api/v0/sample-product"><span><strong>点击上传商品图片</strong><small>PNG/JPG，未上传则使用演示图片</small></span><input id="productImage" type="file" name="product_image" accept="image/*"></label></div>
+        </div>
+        <div class="divider"></div>
+        <h2 class="section-title"><span>3</span>直播话术</h2>
+        <div class="field full script"><textarea name="script" required>大家好，欢迎来到直播间。今天给大家介绍的是这款一万毫安时轻薄充电宝。它支持二十二点五瓦快充，也支持 Type-C 双向快充，日常通勤和出差携带都很方便。原价九十九元，今天直播活动价只要七十九元。需要的朋友可以重点关注一下。</textarea></div>
+        <button id="prepareBtn" class="primary" type="submit">生成直播画面</button>
+      </form>
+    </aside>
+    <section class="card stage-card">
+      <div class="stage-head"><div class="live-title"><i id="liveDot" class="dot"></i><span>数字人直播间</span></div><div id="statusPill" class="status-pill">等待配置</div></div>
+      <div class="stage-wrap">
+        <video id="player" playsinline loop preload="metadata"></video>
+        <div id="danmakuList" class="danmaku-layer"></div>
+        <div id="emptyState" class="empty"><img src="/api/v0/fixed-host"><h2>固定数字人主播已就绪</h2><p>填写商品资料和直播稿，生成第一场 V0 直播</p></div>
+        <div id="progress" class="progress"><div class="progress-track"><div id="progressBar" class="progress-bar"></div></div><div id="progressText" class="progress-text">正在准备…</div></div>
+      </div>
+      <div class="stage-foot">
+        <button id="startBtn" class="control-btn start" disabled>开始直播</button>
+        <button id="pauseBtn" class="control-btn" disabled>暂停</button>
+        <button id="resumeBtn" class="control-btn" disabled>恢复</button>
+        <button id="stopBtn" class="control-btn stop" disabled>停止</button>
+        <div id="message" class="message">系统就绪</div>
+      </div>
+      <form id="danmakuForm" class="danmaku-form"><input id="danmakuInput" maxlength="120" placeholder="发个弹幕提问，数字人会生成语音视频回答…" autocomplete="off"><button id="danmakuSend" type="submit">发送</button></form>
+      <div id="embedLink" class="embed-link">商城 iframe 地址：<code id="embedUrl"></code></div>
+    </section>
+  </div>
+</main>
+<script>
+  const form=document.querySelector('#liveForm'), player=document.querySelector('#player'), empty=document.querySelector('#emptyState');
+  const progress=document.querySelector('#progress'), bar=document.querySelector('#progressBar'), progressText=document.querySelector('#progressText');
+  const prepareBtn=document.querySelector('#prepareBtn'), statusPill=document.querySelector('#statusPill'), message=document.querySelector('#message'), dot=document.querySelector('#liveDot');
+  const startBtn=document.querySelector('#startBtn'), pauseBtn=document.querySelector('#pauseBtn'), resumeBtn=document.querySelector('#resumeBtn'), stopBtn=document.querySelector('#stopBtn');
+  const danmakuList=document.querySelector('#danmakuList'),danmakuForm=document.querySelector('#danmakuForm'),danmakuInput=document.querySelector('#danmakuInput'),danmakuSend=document.querySelector('#danmakuSend');
+  let sessionId=null, pollTimer=null, mainVideoUrl='', currentState=null;
+  const displayed=new Set(), playedReplies=new Set();
+  document.querySelector('#productImage').addEventListener('change',e=>{const f=e.target.files[0];if(f)document.querySelector('#imagePreview').src=URL.createObjectURL(f)});
+  function setControls(state){const ready=state?.render_status==='ready';startBtn.disabled=!ready;pauseBtn.disabled=!ready||state.playback!=='playing';resumeBtn.disabled=!ready||state.playback!=='paused';stopBtn.disabled=!ready||state.playback==='stopped';dot.className='dot '+(state?.playback==='playing'?'playing':ready?'ready':'');statusPill.textContent=state?.playback==='playing'?'直播中':state?.playback==='paused'?'已暂停':state?.render_status==='rendering'?'生成中':ready?'画面就绪':'等待配置'}
+  function addDanmaku(text,host=false){const item=document.createElement('div');item.className='danmaku-item'+(host?' host':'');item.textContent=text;danmakuList.appendChild(item);while(danmakuList.children.length>7)danmakuList.removeChild(danmakuList.firstChild)}
+  async function playReply(item){if(!item.video_url||playedReplies.has(item.id))return;playedReplies.add(item.id);player.pause();player.loop=false;player.dataset.mode='reply';player.src=item.video_url+'?v='+Date.now();try{await player.play()}catch(_){message.textContent='数字人回答已生成，点击画面播放'} }
+  function restoreMain(){if(!mainVideoUrl)return;player.loop=true;player.dataset.mode='main';player.src=mainVideoUrl;if(currentState?.playback==='playing')player.play().catch(()=>{})}
+  player.addEventListener('ended',()=>{if(player.dataset.mode==='reply')restoreMain()});
+  function renderInteractions(items){(items||[]).forEach(item=>{if(!displayed.has(item.id+':q')){displayed.add(item.id+':q');addDanmaku(`${item.user||'观众'}：${item.question}`)}if(item.answer&&!displayed.has(item.id+':a')){displayed.add(item.id+':a');addDanmaku(`数字人：${item.answer}`,true)}if(item.status==='ready')playReply(item)})}
+  function renderState(s){currentState=s;message.textContent=s.message||'';bar.style.width=(s.progress||0)+'%';progressText.textContent=`${s.message||'处理中'}  ${s.progress||0}%`;setControls(s);renderInteractions(s.interactions);if(s.render_status==='ready'){progress.style.display='none';prepareBtn.disabled=false;prepareBtn.textContent='重新生成直播画面';mainVideoUrl=s.video_url+'?v='+encodeURIComponent(s.updated_at||'');if(!player.src){restoreMain();empty.style.display='none';player.style.display='block'}document.querySelector('#embedLink').style.display='block';document.querySelector('#embedUrl').textContent=location.origin+s.embed_url}else if(s.render_status==='failed'){progress.style.display='none';prepareBtn.disabled=false;prepareBtn.textContent='重新生成';alert(s.message)}}
+  async function poll(){if(!sessionId)return;try{const r=await fetch('/api/v0/live/'+sessionId);renderState(await r.json())}catch(e){message.textContent='状态连接暂时中断'} }
+  form.addEventListener('submit',async e=>{e.preventDefault();clearInterval(pollTimer);player.pause();player.removeAttribute('src');player.load();mainVideoUrl='';sessionId=null;displayed.clear();playedReplies.clear();danmakuList.innerHTML='';prepareBtn.disabled=true;prepareBtn.textContent='生成中…';empty.style.display='flex';progress.style.display='block';bar.style.width='2%';progressText.textContent='正在提交任务…';const r=await fetch('/api/v0/live/create',{method:'POST',body:new FormData(form)});const data=await r.json();if(!r.ok){prepareBtn.disabled=false;progress.style.display='none';alert(data.detail||'提交失败');return}sessionId=data.id;renderState(data);pollTimer=setInterval(poll,1200);poll()});
+  async function control(action){if(!sessionId)return;const r=await fetch(`/api/v0/live/${sessionId}/${action}`,{method:'POST'});const data=await r.json();if(!r.ok){alert(data.detail||'控制失败');return}if(action==='start'||action==='resume')await player.play();if(action==='pause')player.pause();if(action==='stop'){player.pause();player.currentTime=0}renderState(data)}
+  startBtn.onclick=()=>control('start');pauseBtn.onclick=()=>control('pause');resumeBtn.onclick=()=>control('resume');stopBtn.onclick=()=>control('stop');
+  danmakuForm.addEventListener('submit',async e=>{e.preventDefault();const text=danmakuInput.value.trim();if(!text||!sessionId)return;if(currentState?.render_status!=='ready'){alert('请先生成直播画面');return}danmakuInput.value='';danmakuSend.disabled=true;const r=await fetch(`/api/v0/live/${sessionId}/danmaku`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,user:'我'})});const data=await r.json();danmakuSend.disabled=false;if(!r.ok){alert(data.detail||'弹幕发送失败');return}if(!displayed.has(data.id+':q')){displayed.add(data.id+':q');addDanmaku('我：'+text)}message.textContent='数字人正在思考并生成语音回答…';poll()});
+  fetch('/api/v0/live/current').then(r=>r.ok?r.json():null).then(s=>{if(!s)return;sessionId=s.id;renderState(s);pollTimer=setInterval(poll,1200)}).catch(()=>{});
+  fetch('/api/v0/health').then(r=>r.json()).then(x=>{message.textContent=x.ok?'模型、主播、音色和场景引擎均已就绪':'系统组件不完整，请检查服务日志'}).catch(()=>message.textContent='健康检查失败');
+</script>
+</body>
+</html>

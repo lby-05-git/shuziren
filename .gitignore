@@ -1,0 +1,33 @@
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+
+# Generated media, uploaded biometric material, caches and runtime state
+outputs/
+logs/
+backups/
+uploads/
+__pycache__/
+*.py[cod]
+*.pid
+*.log
+*.wav
+*.mp3
+*.m4a
+*.mp4
+*.mov
+
+# Models, environments and external engines are provisioned separately
+models/
+checkpoints/
+venv/
+.venv/
+env/
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
