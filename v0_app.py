@@ -723,7 +723,7 @@ async def create_live(
         "custom_portrait": portrait_path != FIXED_HOST,
         "custom_voice": custom_voice,
         "reference_text": reference_text.strip(),
-        "expression_mode": expression_mode if expression_mode in {"normal", "funny"} else "normal",
+        "expression_mode": expression_mode if expression_mode in {"normal", "funny", "enhanced"} else "normal",
         "video_layout": "avatar_only",
         "interactions": [],
     }

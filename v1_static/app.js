@@ -435,15 +435,40 @@
     return picks.length ? picks : PRODUCTS.slice(0, 8);
   }
 
-  /* 自定义货盘：用户选品存 localStorage，为空则回退默认货盘 */
+  var LIVE_SCENE_KEY = "eget_live_scene";
+  var LIVE_SCENES = {
+    "3c": "3C直播间",
+    food: "食品直播间",
+    beauty: "美妆直播间",
+    fashion: "服装直播间",
+    general: "通用直播间"
+  };
+  function normalizeLiveScene(scene) {
+    return Object.prototype.hasOwnProperty.call(LIVE_SCENES, scene) ? scene : "3c";
+  }
+
+  /* 自定义货盘：用户选品存 localStorage，新实例先恢复已验收的 7 件货盘。 */
   var LIVE_PICK_KEY = "eget_live_picks";
+  var LIVE_PICK_VERSION_KEY = "eget_live_picks_version";
+  var LIVE_PICK_VERSION = "accepted-seven-20260923";
+  var LIVE_DEFAULT_SKUS = [
+    "5675882", "5675887", "6040693", "6030478",
+    "6020472", "6040698", "6001654"
+  ];
   function loadLiveGoods() {
     var skus = [];
-    try { skus = JSON.parse(localStorage.getItem(LIVE_PICK_KEY) || "[]"); } catch (e) { skus = []; }
+    try {
+      skus = JSON.parse(localStorage.getItem(LIVE_PICK_KEY) || "[]");
+      if (localStorage.getItem(LIVE_PICK_VERSION_KEY) !== LIVE_PICK_VERSION) {
+        skus = LIVE_DEFAULT_SKUS.slice();
+        localStorage.setItem(LIVE_PICK_KEY, JSON.stringify(skus));
+        localStorage.setItem(LIVE_PICK_VERSION_KEY, LIVE_PICK_VERSION);
+      }
+    } catch (e) { skus = LIVE_DEFAULT_SKUS.slice(); }
     if (!Array.isArray(skus) || !skus.length) return null;
-    var set = {};
-    skus.forEach(function (s) { set[s] = true; });
-    var goods = PRODUCTS.filter(function (p) { return set[p.sku]; });
+    var bySku = {};
+    PRODUCTS.forEach(function (p) { bySku[String(p.sku)] = p; });
+    var goods = skus.map(function (sku) { return bySku[String(sku)]; }).filter(Boolean);
     return goods.length ? goods : null;
   }
 
@@ -458,7 +483,8 @@
       sessionId: null, digitalHuman: null, mainVideoUrl: "", seenInteractions: {}, playedReplies: {},
       commentaryBusy: false, initialCommentaryRequested: false, activeSku: "", submittingHost: false,
       durations: {}, statusSocket: null, socketSessionId: "", rtcPc: null, rtcKey: "", rtcConnecting: false, rtcFallbackKey: "",
-      queueSignature: "", queueOrderSyncing: false, previewPortraitUrl: "", autoApplyTimer: null, pendingHostApply: false
+      queueSignature: "", queueOrderSyncing: false, previewPortraitUrl: "", autoApplyTimer: null, pendingHostApply: false,
+      displayScene: normalizeLiveScene(localStorage.getItem(LIVE_SCENE_KEY) || "3c"), sceneSwitching: false
     };
     goods.forEach(function (product) { state.durations[String(product.sku)] = 300; });
 
@@ -470,13 +496,14 @@
       '<div class="live-layout">' +
         /* 左：直播画面 */
         '<div class="live-stage-col">' +
-          '<div class="live-stage" id="liveStage">' +
+          '<div class="live-stage" id="liveStage" data-scene="' + state.displayScene + '">' +
             '<div class="live-stage-top">' +
               '<span class="live-badge" id="liveConnection"><i></i>连接数字人</span>' +
               '<span class="live-viewers" id="liveViewers"></span>' +
             "</div>" +
             '<div class="live-danmaku" id="liveDanmaku"></div>' +
             '<video class="live-real-video" id="liveVideo" playsinline loop preload="metadata"></video>' +
+            '<div class="live-scene-skin" id="liveSceneSkin" aria-hidden="true"><span id="liveSceneLabel"></span></div>' +
             '<a class="live-product-layer" id="liveProductLayer" hidden></a>' +
             '<div class="live-subtitle-layer" id="liveSubtitleLayer" hidden></div>' +
             '<div class="live-video-empty" id="liveVideoEmpty"><strong>AI 数字人主播</strong><span>正在连接 AutoDL 直播服务…</span></div>' +
@@ -488,7 +515,7 @@
               '<label class="live-upload-card"><input id="liveVoiceInput" type="file" accept="audio/*"><b>上传克隆声音</b><span id="liveVoiceName">建议 5–15 秒清晰录音</span></label>' +
               '<label class="live-upload-card"><input id="liveProductVideoInput" type="file" accept="video/*"><b>商品特写视频（可选）</b><span id="liveProductVideoName">用于队列首件商品特写</span></label>' +
               '<input class="live-reference-text" id="liveReferenceText" maxlength="200" placeholder="录音文字（可选，需与录音内容一致）">' +
-              '<select class="live-expression-mode" id="liveExpressionMode" aria-label="表情模式"><option value="normal">正常表情</option><option value="funny">搞怪表情与动作</option></select>' +
+              '<select class="live-expression-mode" id="liveExpressionMode" aria-label="表情模式"><option value="normal">正常表情</option><option value="enhanced">眼神与微表情增强</option><option value="funny">搞怪表情与动作</option></select>' +
               '<select class="live-expression-mode" id="liveSceneTemplate" aria-label="直播场景"><option value="3c">3C直播间</option><option value="food">食品直播间</option><option value="beauty">美妆直播间</option><option value="fashion">服装直播间</option><option value="general">通用直播间</option></select>' +
               '<select class="live-expression-mode" id="liveOrientation" aria-label="画面方向"><option value="landscape">横屏 16:9</option><option value="portrait">竖屏 9:16</option></select>' +
               '<button class="live-apply-host" id="liveApplyHostBtn" type="button">应用形象/声音并重新生成</button>' +
@@ -524,6 +551,9 @@
     var liveSubtitleLayer = document.getElementById("liveSubtitleLayer");
     var liveConnection = document.getElementById("liveConnection");
     var liveStudioStatus = document.getElementById("liveStudioStatus");
+    var liveStage = document.getElementById("liveStage");
+    var liveSceneLabel = document.getElementById("liveSceneLabel");
+    var liveSceneTemplate = document.getElementById("liveSceneTemplate");
     var livePortraitInput = document.getElementById("livePortraitInput");
     var liveVoiceInput = document.getElementById("liveVoiceInput");
     var liveProductVideoInput = document.getElementById("liveProductVideoInput");
@@ -532,6 +562,41 @@
     var livePauseBtn = document.getElementById("livePauseBtn");
     var liveResumeBtn = document.getElementById("liveResumeBtn");
     var liveStopBtn = document.getElementById("liveStopBtn");
+
+    function applySceneTemplate(scene) {
+      scene = normalizeLiveScene(scene);
+      state.displayScene = scene;
+      liveStage.setAttribute("data-scene", scene);
+      liveSceneTemplate.value = scene;
+      liveSceneLabel.textContent = LIVE_SCENES[scene];
+      try { localStorage.setItem(LIVE_SCENE_KEY, scene); } catch (e) {}
+    }
+
+    function switchSceneTemplate(scene) {
+      var previous = state.displayScene;
+      scene = normalizeLiveScene(scene);
+      applySceneTemplate(scene);
+      if (!state.sessionId || !state.digitalHuman || String(state.digitalHuman.version || "").indexOf("V1") !== 0) {
+        toast("已切换到" + LIVE_SCENES[scene]);
+        return;
+      }
+      state.sceneSwitching = true;
+      api("/api/v1/live/" + state.sessionId + "/scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scene_template: scene })
+      }).then(function (session) {
+        state.sceneSwitching = false;
+        renderDigitalHuman(session);
+        toast("已切换到" + LIVE_SCENES[scene]);
+      }).catch(function (error) {
+        state.sceneSwitching = false;
+        applySceneTemplate(previous);
+        toast("场景切换失败：" + error.message);
+      });
+    }
+
+    applySceneTemplate(state.displayScene);
 
     function updateStudioControls(session) {
       var ready = Boolean(session && session.render_status === "ready");
@@ -788,6 +853,9 @@
     function renderDigitalHuman(session) {
       state.digitalHuman = session;
       state.sessionId = session.id;
+      if (!state.sceneSwitching) {
+        applySceneTemplate(session.display_scene_template || session.scene_template || state.displayScene);
+      }
       updateStudioControls(session);
       connectStatusSocket(session);
       syncLiveQueueOrder(session);
@@ -1219,7 +1287,8 @@
         if (event.target.id === "livePickMask") close();
       };
       document.getElementById("livePickReset").onclick = function () {
-        localStorage.removeItem(LIVE_PICK_KEY);
+        localStorage.setItem(LIVE_PICK_KEY, JSON.stringify(LIVE_DEFAULT_SKUS));
+        localStorage.setItem(LIVE_PICK_VERSION_KEY, LIVE_PICK_VERSION);
         close();
         clearLiveTimers();
         viewLive();
@@ -1229,6 +1298,7 @@
         var skus = PRODUCTS.filter(function (p) { return checked[p.sku]; }).map(function (p) { return p.sku; });
         if (!skus.length) { toast("至少选择 1 件商品"); return; }
         localStorage.setItem(LIVE_PICK_KEY, JSON.stringify(skus));
+        localStorage.setItem(LIVE_PICK_VERSION_KEY, LIVE_PICK_VERSION);
         close();
         clearLiveTimers();
         viewLive();
@@ -1285,6 +1355,7 @@
       document.getElementById("liveProductVideoName").textContent = liveProductVideoInput.files[0] ? liveProductVideoInput.files[0].name : "用于队列首件商品特写";
     };
     liveApplyHostBtn.onclick = createHostSession;
+    liveSceneTemplate.onchange = function () { switchSceneTemplate(liveSceneTemplate.value); };
     liveStartBtn.onclick = function () { controlLive("start"); };
     livePauseBtn.onclick = function () { controlLive("pause"); };
     liveResumeBtn.onclick = function () { controlLive("resume"); };

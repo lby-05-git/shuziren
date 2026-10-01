@@ -119,6 +119,10 @@ class QueueOrderRequest(BaseModel):
     skus: list[str]
 
 
+class SceneSwitchRequest(BaseModel):
+    scene_template: str
+
+
 class RTCOfferRequest(BaseModel):
     sdp: str
     type: str
@@ -1921,7 +1925,7 @@ async def create_live(
         raise HTTPException(status_code=422, detail="商品队列需包含 1–30 件商品")
     scene_template = scene_template if scene_template in SCENE_TEMPLATES else "general"
     orientation = orientation if orientation in {"landscape", "portrait"} else "landscape"
-    expression_mode = expression_mode if expression_mode in {"normal", "funny"} else "normal"
+    expression_mode = expression_mode if expression_mode in {"normal", "funny", "enhanced"} else "normal"
 
     session_id = uuid.uuid4().hex[:24]
     job_path = _session_path(session_id)
@@ -2003,6 +2007,7 @@ async def create_live(
         "auto_rotate": bool(auto_rotate),
         "manual_pause": False,
         "scene_template": scene_template,
+        "display_scene_template": scene_template,
         "orientation": orientation,
         "expression_mode": expression_mode,
         "portrait_path": str(portrait_path),
@@ -2108,6 +2113,7 @@ def retry_live(session_id: str) -> dict[str, Any]:
         "auto_rotate": bool(source.get("auto_rotate", True)),
         "manual_pause": False,
         "scene_template": source.get("scene_template", "general"),
+        "display_scene_template": source.get("display_scene_template", source.get("scene_template", "general")),
         "orientation": source.get("orientation", "landscape"),
         "expression_mode": source.get("expression_mode", "normal"),
         "portrait_path": str(portrait_path),
@@ -2202,6 +2208,7 @@ def _clone_live_with_queue(
         "auto_rotate": bool(source.get("auto_rotate", True)),
         "manual_pause": False,
         "scene_template": source.get("scene_template", "general"),
+        "display_scene_template": source.get("display_scene_template", source.get("scene_template", "general")),
         "orientation": source.get("orientation", "landscape"),
         "expression_mode": source.get("expression_mode", "normal"),
         "portrait_path": str(portrait_path),
@@ -2455,6 +2462,23 @@ def resume_live(session_id: str) -> dict[str, Any]:
 @router.post("/api/live/{session_id}/stop")
 def stop_live(session_id: str) -> dict[str, Any]:
     return control_live(session_id, "stop")
+
+
+@router.post("/api/v1/live/{session_id}/scene")
+@router.post("/api/live/{session_id}/scene")
+def switch_scene(session_id: str, request: SceneSwitchRequest) -> dict[str, Any]:
+    scene_template = str(request.scene_template or "").strip()
+    if scene_template not in SCENE_TEMPLATES:
+        raise HTTPException(status_code=422, detail="未知直播场景")
+    with _sessions_lock:
+        session = _sessions.get(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="V1 直播 Session 不存在")
+        session["display_scene_template"] = scene_template
+        session["message"] = f"已切换到{SCENE_TEMPLATES[scene_template]['label']}"
+        session["updated_at"] = _now()
+        _write_session(session)
+        return _public_session(session)
 
 
 @router.get("/api/v1/live/{session_id}/items/{index}/video", include_in_schema=False)

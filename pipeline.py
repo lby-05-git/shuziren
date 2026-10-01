@@ -653,6 +653,62 @@ def _build_funny_motion_template() -> Path:
     return output_path
 
 
+def _build_enhanced_motion_template() -> Path:
+    """Build a restrained talking loop with periodic blink/head micro-expressions."""
+    driving_dir = LIVEPORTRAIT_DIR / "assets" / "examples" / "driving"
+    output_path = driving_dir / "digital_human_enhanced_v1.pkl"
+    if output_path.exists():
+        with output_path.open("rb") as handle:
+            cached = pickle.load(handle)
+        if cached.get("motion") and cached.get("n_frames") == len(cached["motion"]):
+            return output_path
+
+    source_paths = [
+        driving_dir / "talking.pkl",
+        driving_dir / "wink.pkl",
+        driving_dir / "shake_face.pkl",
+    ]
+    if not all(path.exists() for path in source_paths):
+        raise PipelineError("LivePortrait 眼神与微表情动作素材不完整。")
+
+    with source_paths[0].open("rb") as handle:
+        talking = pickle.load(handle)
+    with source_paths[1].open("rb") as handle:
+        wink = pickle.load(handle)
+    with source_paths[2].open("rb") as handle:
+        shake = pickle.load(handle)
+
+    # Keep the natural talking motion as the main rhythm, then add two short,
+    # low-amplitude expression beats.  The relative pose alignment prevents a
+    # visible jump when the blink or head turn starts.
+    combined = list(talking["motion"])
+    for sequence, strength in ((wink["motion"], 0.52), (shake["motion"], 0.28)):
+        first = sequence[0]
+        previous = combined[-1]
+        for frame in sequence:
+            aligned = {
+                "exp": previous["exp"] + (frame["exp"] - first["exp"]) * strength,
+                "t": previous["t"] + (frame["t"] - first["t"]) * strength,
+                "scale": previous["scale"] + (frame["scale"] - first["scale"]) * strength,
+                "R": (frame["R"] @ first["R"].transpose(0, 2, 1)) @ previous["R"],
+            }
+            combined.append(aligned)
+            previous = aligned
+
+    # Return to the talking pose so looping does not snap back at the seam.
+    combined.extend(reversed(combined[1:-1]))
+    payload = {
+        "n_frames": len(combined),
+        "output_fps": 25,
+        "motion": combined,
+        "c_eyes_lst": [np.zeros((1, 2), dtype=np.float32) for _ in combined],
+        "c_lip_lst": [np.zeros((1, 1), dtype=np.float32) for _ in combined],
+    }
+    with output_path.open("wb") as handle:
+        pickle.dump(payload, handle)
+    return output_path
+
+
 def _build_normal_motion_template() -> Path:
     driving_dir = LIVEPORTRAIT_DIR / "assets" / "examples" / "driving"
     source_path = driving_dir / "talking.pkl"
@@ -681,8 +737,12 @@ def animate_portrait(
     expression_mode: str,
     status: Callable[[str], None] | None = None,
 ) -> Path:
-    mode = expression_mode if expression_mode in {"normal", "funny"} else "normal"
-    if mode == "funny":
+    mode = expression_mode if expression_mode in {"normal", "funny", "enhanced"} else "normal"
+    if mode == "enhanced":
+        template_path = _build_enhanced_motion_template()
+        multiplier = "0.88"
+        mode_text = "眼神与微表情增强"
+    elif mode == "funny":
         template_path = _build_funny_motion_template()
         multiplier = "1.65"
         mode_text = "搞怪表情与动作"

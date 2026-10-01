@@ -117,10 +117,10 @@ with gr.Blocks(title="本地 AI 数字人", css=CSS) as demo:
                 placeholder="如果填写，请和录音内容完全一致",
             )
             expression_mode = gr.Radio(
-                choices=[("正常表情", "normal"), ("搞怪表情与动作", "funny")],
+                choices=[("正常表情", "normal"), ("眼神与微表情增强", "enhanced"), ("搞怪表情与动作", "funny")],
                 value="normal",
                 label="表情模式",
-                info="搞怪模式会在说话时加入大笑、摇头和眨眼动作",
+                info="增强模式会在说话时加入低幅度眨眼、转头和微表情；搞怪模式会加入大笑、摇头和眨眼动作",
             )
             consent = gr.Checkbox(
                 label="我确认已获得照片及声音所有者授权",
