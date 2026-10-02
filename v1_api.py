@@ -63,8 +63,8 @@ LIVE_LLM_BASE_URL = os.environ.get("LIVE_LLM_BASE_URL", "https://api.apikey.fan/
 LIVE_LLM_MODEL = os.environ.get("LIVE_LLM_MODEL", "deepseek-v4.1-flash").strip()
 SCRIPT_LIBRARY_DB = PROJECT_DIR / "outputs" / "script_library.sqlite3"
 VIDEO_LIBRARY_DIR = PROJECT_DIR / "outputs" / "video_library"
-SCRIPT_FORMAT_VERSION = "v1-lively-pronunciation-full-duration-20260923"
-VIDEO_FORMAT_VERSION = "v1-lively-pronunciation-layered-20260923"
+SCRIPT_FORMAT_VERSION = "v2-emotion-camera-director-20261002"
+VIDEO_FORMAT_VERSION = "v2-emotion-camera-director-layered-20261002"
 VIDEO_LAYOUT = "layered"
 
 ACTION_LIBRARY: dict[str, dict[str, str]] = {
@@ -78,6 +78,30 @@ ACTION_LIBRARY: dict[str, dict[str, str]] = {
     "next_product": {"label": "切换商品", "motion": "transition", "camera": "wide"},
     "idle": {"label": "待机", "motion": "idle", "camera": "medium"},
 }
+
+CAMERA_LABELS: dict[str, str] = {
+    "wide": "全景",
+    "medium": "中景",
+    "medium_close": "中近景",
+    "product_closeup": "商品特写",
+}
+
+
+def _camera_for(action: str, requested: Any = None) -> str:
+    camera = str(requested or "").strip()
+    if camera in CAMERA_LABELS:
+        return camera
+    return ACTION_LIBRARY.get(action, ACTION_LIBRARY["idle"])["camera"]
+
+
+def _normalize_plan_cameras(plan: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for source in plan:
+        item = dict(source)
+        action = str(item.get("action") or "idle")
+        item["camera"] = _camera_for(action, item.get("camera"))
+        normalized.append(item)
+    return normalized
 
 SCENE_TEMPLATES: dict[str, dict[str, str]] = {
     "3c": {"label": "3C直播间", "color": "2563eb", "accent": "38bdf8"},
@@ -710,7 +734,11 @@ def _video_versions_for_sku(sku: str) -> list[dict[str, Any]]:
 def _current_action(session: dict[str, Any], item: dict[str, Any]) -> dict[str, str]:
     plan = item.get("script_plan") or []
     if not plan or session.get("playback") in {"preparing", "stopped"}:
-        return {"action": "idle", "emotion": "neutral", **ACTION_LIBRARY["idle"]}
+        camera = _camera_for("idle")
+        return {
+            "action": "idle", "emotion": "neutral", **ACTION_LIBRARY["idle"],
+            "camera": camera, "camera_label": CAMERA_LABELS[camera],
+        }
     elapsed = float(session.get("item_elapsed_seconds") or 0)
     if session.get("playback") == "playing" and session.get("item_started_epoch"):
         elapsed += max(0.0, time.time() - float(session["item_started_epoch"]))
@@ -719,13 +747,23 @@ def _current_action(session: dict[str, Any], item: dict[str, Any]) -> dict[str, 
     for segment in plan:
         if float(segment.get("start") or 0) <= cursor < float(segment.get("end") or video_duration):
             action = segment.get("action") if segment.get("action") in ACTION_LIBRARY else "idle"
+            camera = _camera_for(action, segment.get("camera"))
             return {
                 "action": action,
                 "emotion": str(segment.get("emotion") or "neutral"),
                 **ACTION_LIBRARY[action],
+                "camera": camera,
+                "camera_label": CAMERA_LABELS[camera],
             }
     action = plan[-1].get("action") if plan[-1].get("action") in ACTION_LIBRARY else "idle"
-    return {"action": action, "emotion": str(plan[-1].get("emotion") or "neutral"), **ACTION_LIBRARY[action]}
+    camera = _camera_for(action, plan[-1].get("camera"))
+    return {
+        "action": action,
+        "emotion": str(plan[-1].get("emotion") or "neutral"),
+        **ACTION_LIBRARY[action],
+        "camera": camera,
+        "camera_label": CAMERA_LABELS[camera],
+    }
 
 
 def _public_session(session: dict[str, Any]) -> dict[str, Any]:
@@ -968,7 +1006,8 @@ def _generate_plan(
     research["duration_seconds"] = duration_seconds
     research["script_seconds"] = script_seconds
     research["target_chars"] = target_chars
-    fallback = _fallback_plan(product, has_next, duration_seconds)
+    fallback = _normalize_plan_cameras(_fallback_plan(product, has_next, duration_seconds))
+    research["camera_direction"] = True
     if not LIVE_LLM_API_KEY:
         research["llm_error"] = "LIVE_LLM_API_KEY 未加载"
         return fallback, "local/duration-template-no-key", research
@@ -983,7 +1022,9 @@ def _generate_plan(
         "联网摘要只用于补充可核验的功能、规格、适用人群和使用场景。"
         "若搜索资料冲突或无法确认，就明确提示以官方商品页为准，禁止虚构最低价、库存、销量、赠品、功效或参数。"
         "只返回JSON对象，格式为{\"segments\":[{\"stage\":\"welcome\",\"text\":\"...\"," 
-        "\"action\":\"welcome\",\"emotion\":\"friendly\"}]}。action只能使用：" + actions + "。"
+        "\"action\":\"welcome\",\"emotion\":\"friendly\",\"camera\":\"medium\"}]}。"
+        "action只能使用：" + actions + "；camera只能使用wide、medium、medium_close、product_closeup。"
+        "请让情绪、动作和镜头匹配：商品细节用product_closeup，价格和促单用medium_close，切品用wide。"
         "不要Markdown，不要输出JSON以外内容。商城事实：" + _product_facts(product) +
         " 联网搜索结果：" + sources_text
     )
@@ -1014,6 +1055,7 @@ def _generate_plan(
                     "text": text[:320],
                     "action": action,
                     "emotion": str(entry.get("emotion") or "neutral")[:24],
+                    "camera": _camera_for(action, entry.get("camera")),
                 })
         return result
 
@@ -1120,8 +1162,9 @@ def _extend_plan_for_audio_duration(
         "参数解释、价格提醒、互动提问或购买注意事项；不得虚构参数、库存、销量、赠品、最低价或功效。"
         f"请补写约{additional_chars}字，共{additional_count}段。"
         "action只能从point_product、size、recommend、price、discount、buy_now中选择。"
+        "camera只能从wide、medium、medium_close、product_closeup中选择，并与内容匹配。"
         "只返回JSON对象，格式为{\"segments\":[{\"stage\":\"detail\",\"text\":\"...\","
-        "\"action\":\"recommend\",\"emotion\":\"friendly\"}]}，不要Markdown。"
+        "\"action\":\"recommend\",\"emotion\":\"friendly\",\"camera\":\"medium\"}]}，不要Markdown。"
         "商城事实：" + _product_facts(product) +
         " 联网摘要：" + json.dumps(research.get("sources") or [], ensure_ascii=False) +
         " 现有话术：" + json.dumps([item.get("text") for item in plan], ensure_ascii=False)
@@ -1154,6 +1197,7 @@ def _extend_plan_for_audio_duration(
                     "text": text[:360],
                     "action": action,
                     "emotion": str(entry.get("emotion") or "friendly")[:24],
+                    "camera": _camera_for(action, entry.get("camera")),
                 })
             if len(additions) >= available_slots:
                 break

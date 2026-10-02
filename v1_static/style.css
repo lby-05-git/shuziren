@@ -534,7 +534,22 @@ body.auth-mode .app { max-width: none; min-height: 100vh; margin: 0; padding: 0;
 .live-stage[data-scene="beauty"] { --scene-rgb: 190, 24, 93; --scene-accent-rgb: 251, 113, 133; }
 .live-stage[data-scene="fashion"] { --scene-rgb: 24, 24, 27; --scene-accent-rgb: 212, 212, 216; }
 .live-stage[data-scene="general"] { --scene-rgb: 5, 150, 105; --scene-accent-rgb: 14, 165, 233; }
-.live-real-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #070b17; }
+.live-real-video {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #070b17;
+  transform: scale(1); transform-origin: 50% 52%; transition: transform .7s cubic-bezier(.2, .75, .2, 1);
+}
+.live-stage[data-camera="wide"] .live-real-video { transform: scale(.92); }
+.live-stage[data-camera="medium_close"] .live-real-video { transform: scale(1.09); }
+.live-stage[data-camera="product_closeup"] .live-real-video { transform: translateX(-8%) scale(.96); }
+.live-stage[data-camera="wide"] .live-product-layer { transform: scale(.86); opacity: .9; }
+.live-stage[data-camera="medium_close"] .live-product-layer { transform: scale(.94); }
+.live-stage[data-camera="product_closeup"] .live-product-layer { width: min(31%, 226px); transform: scale(1.04); }
+.live-camera-badge {
+  position: absolute; top: 58px; right: 14px; z-index: 5; padding: 4px 10px;
+  border: 1px solid rgba(255,255,255,.38); border-radius: 999px;
+  background: rgba(4,9,26,.58); color: #fff; font-size: 11px; font-weight: 700;
+  backdrop-filter: blur(8px); pointer-events: none;
+}
 .live-scene-skin {
   position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background:
@@ -566,6 +581,7 @@ body.auth-mode .app { max-width: none; min-height: 100vh; margin: 0; padding: 0;
   border: 1px solid rgba(255, 255, 255, .72); border-radius: 14px;
   background: rgba(255, 255, 255, .94); color: var(--ink);
   box-shadow: 0 14px 34px rgba(4, 9, 30, .34); backdrop-filter: blur(10px);
+  transform-origin: right bottom; transition: width .55s ease, transform .55s ease, opacity .55s ease;
 }
 .live-product-layer[hidden] { display: none; }
 .live-product-layer img { width: 72%; aspect-ratio: 1; object-fit: contain; border-radius: 9px; background: #f6f7fb; }

@@ -443,6 +443,17 @@
     fashion: "服装直播间",
     general: "通用直播间"
   };
+  var LIVE_CAMERAS = {
+    wide: "全景",
+    medium: "中景",
+    medium_close: "中近景",
+    product_closeup: "商品特写"
+  };
+  var LIVE_ACTION_CAMERAS = {
+    point_product: "product_closeup", size: "product_closeup",
+    price: "medium_close", discount: "medium_close", buy_now: "medium_close",
+    next_product: "wide"
+  };
   function normalizeLiveScene(scene) {
     return Object.prototype.hasOwnProperty.call(LIVE_SCENES, scene) ? scene : "3c";
   }
@@ -501,6 +512,7 @@
               '<span class="live-badge" id="liveConnection"><i></i>连接数字人</span>' +
               '<span class="live-viewers" id="liveViewers"></span>' +
             "</div>" +
+            '<span class="live-camera-badge" id="liveCameraBadge">中景</span>' +
             '<div class="live-danmaku" id="liveDanmaku"></div>' +
             '<video class="live-real-video" id="liveVideo" playsinline loop preload="metadata"></video>' +
             '<div class="live-scene-skin" id="liveSceneSkin" aria-hidden="true"><span id="liveSceneLabel"></span></div>' +
@@ -553,6 +565,7 @@
     var liveStudioStatus = document.getElementById("liveStudioStatus");
     var liveStage = document.getElementById("liveStage");
     var liveSceneLabel = document.getElementById("liveSceneLabel");
+    var liveCameraBadge = document.getElementById("liveCameraBadge");
     var liveSceneTemplate = document.getElementById("liveSceneTemplate");
     var livePortraitInput = document.getElementById("livePortraitInput");
     var liveVoiceInput = document.getElementById("liveVoiceInput");
@@ -609,8 +622,9 @@
       liveResumeBtn.disabled = !ready || playback !== "paused";
       liveStopBtn.disabled = !ready || playback === "stopped";
       var action = session && session.current_action ? " · " + (session.current_action.label || session.current_action.action) : "";
+      var camera = session && session.current_action && session.current_action.camera_label ? " · " + session.current_action.camera_label : "";
       var remaining = session && typeof session.remaining_seconds === "number" ? " · " + session.remaining_seconds + "秒后切换" : "";
-      liveStudioStatus.textContent = state.submittingHost ? "正在上传" : generating ? "生成中 " + (session.progress || 0) + "%" : playback === "playing" ? "直播中" + action + remaining : playback === "paused" ? "已暂停" + action : ready ? "画面已就绪" : "等待连接";
+      liveStudioStatus.textContent = state.submittingHost ? "正在上传" : generating ? "生成中 " + (session.progress || 0) + "%" : playback === "playing" ? "直播中" + action + camera + remaining : playback === "paused" ? "已暂停" + action + camera : ready ? "画面已就绪" : "等待连接";
     }
 
     function closeWebRTC() {
@@ -809,10 +823,19 @@
       return lines.length ? lines : [String(text || "")];
     }
 
+    function applyCameraDirection(segment) {
+      var requested = segment && String(segment.camera || "");
+      var action = segment && String(segment.action || "");
+      var camera = LIVE_CAMERAS[requested] ? requested : (LIVE_ACTION_CAMERAS[action] || "medium");
+      liveStage.setAttribute("data-camera", camera);
+      liveCameraBadge.textContent = LIVE_CAMERAS[camera];
+    }
+
     function updateLayeredSubtitle() {
       var item = activeQueueItem(state.digitalHuman);
       if (!item || item.video_layout !== "layered" || liveVideo.dataset.mode !== "main") {
         liveSubtitleLayer.hidden = true;
+        applyCameraDirection(null);
         return;
       }
       var time = Number(liveVideo.currentTime || 0);
@@ -820,6 +843,7 @@
       var segment = plan.find(function (entry) {
         return time >= Number(entry.start || 0) && time < Number(entry.end || 0);
       });
+      applyCameraDirection(segment);
       if (!segment || !segment.text) {
         liveSubtitleLayer.hidden = true;
         return;
@@ -837,7 +861,10 @@
       liveProductLayer.hidden = !layered;
       liveSubtitleLayer.hidden = !layered;
       document.getElementById("liveStage").classList.toggle("is-layered", layered);
-      if (!layered) return;
+      if (!layered) {
+        applyCameraDirection(null);
+        return;
+      }
       var product = item.product || currentGoods();
       var uiProduct = goods.find(function (entry) { return String(entry.sku) === String(product.sku || ""); }) || currentGoods();
       liveProductLayer.href = "#/product/" + encodeURIComponent(product.sku || uiProduct.sku || "");
