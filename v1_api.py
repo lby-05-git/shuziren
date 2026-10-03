@@ -32,7 +32,6 @@ from pipeline import (
     _audio_duration,
     _run,
     animate_portrait,
-    generate_reply,
     model_health,
     normalize_portrait,
     prepare_voice_profile,
@@ -86,6 +85,31 @@ CAMERA_LABELS: dict[str, str] = {
     "product_closeup": "商品特写",
 }
 
+PRODUCT_KNOWLEDGE_LABELS: dict[str, str] = {
+    "name": "商品名称",
+    "sale_price": "直播价",
+    "original_price": "原价",
+    "promotion": "优惠",
+    "selling_points": "卖点",
+    "params": "参数",
+    "link": "购买入口",
+}
+
+QUESTION_FIELD_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("sale_price", ("多少钱", "价格", "售价", "到手价", "直播价", "便宜")),
+    ("original_price", ("原价", "日常价", "参考价")),
+    ("promotion", ("优惠", "活动", "满减", "折扣", "券", "赠品")),
+    ("params", ("参数", "配置", "规格", "尺寸", "材质", "容量", "重量", "型号", "颜色", "兼容", "适配", "支持", "续航", "蓝牙")),
+    ("selling_points", ("卖点", "亮点", "特点", "功能", "效果", "适合", "怎么样", "推荐")),
+    ("link", ("链接", "哪里买", "怎么买", "购买", "下单")),
+    ("name", ("叫什么", "商品名", "哪一款", "什么商品")),
+)
+
+GROUNDING_GENERIC_TERMS = (
+    "这个", "这款", "商品", "产品", "支持", "兼容", "适配", "可以", "能不能", "是否", "有没有",
+    "请问", "一下", "的吗", "吗", "呢", "参数", "配置", "功能", "怎么样", "如何", "什么",
+)
+
 
 def _camera_for(action: str, requested: Any = None) -> str:
     camera = str(requested or "").strip()
@@ -102,6 +126,95 @@ def _normalize_plan_cameras(plan: list[dict[str, Any]]) -> list[dict[str, Any]]:
         item["camera"] = _camera_for(action, item.get("camera"))
         normalized.append(item)
     return normalized
+
+
+def _compact_knowledge_value(value: Any, limit: int = 72) -> str:
+    cleaned = re.sub(r"\s+", " ", str(value or "")).strip(" ；;，,")
+    if len(cleaned) <= limit:
+        return cleaned
+    return cleaned[: max(1, limit - 1)].rstrip(" ；;，,") + "…"
+
+
+def _question_subject_terms(question: str) -> set[str]:
+    normalized = re.sub(r"\s+", "", str(question or "").lower())
+    normalized = normalized.replace("ios", "苹果").replace("iphone", "苹果手机").replace("android", "安卓")
+    for term in GROUNDING_GENERIC_TERMS:
+        normalized = normalized.replace(term, " ")
+    chunks = re.findall(r"[a-z0-9]+|[\u4e00-\u9fff]{2,}", normalized)
+    terms: set[str] = set()
+    for chunk in chunks:
+        terms.add(chunk)
+        if re.fullmatch(r"[\u4e00-\u9fff]+", chunk):
+            terms.update(chunk[index:index + 2] for index in range(max(0, len(chunk) - 1)))
+    return {term for term in terms if len(term) >= 2}
+
+
+def _knowledge_entries(product: dict[str, Any]) -> dict[str, str]:
+    return {
+        field: _compact_knowledge_value(product.get(field), 140 if field in {"params", "selling_points"} else 90)
+        for field in PRODUCT_KNOWLEDGE_LABELS
+        if str(product.get(field) or "").strip()
+    }
+
+
+def _grounded_product_answer(question: str, product: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    entries = _knowledge_entries(product)
+    requested: list[str] = []
+    for field, keywords in QUESTION_FIELD_RULES:
+        if any(keyword in question for keyword in keywords) and field not in requested:
+            requested.append(field)
+
+    asks_for_claim = any(keyword in question for keyword in ("支持", "兼容", "适配", "能不能", "可以", "是否", "有没有"))
+    subject_terms = _question_subject_terms(question)
+    searchable = " ".join(entries.get(field, "") for field in ("params", "selling_points", "name")).lower()
+    searchable = searchable.replace("ios", "苹果").replace("iphone", "苹果手机").replace("android", "安卓")
+    if asks_for_claim and subject_terms and not any(term in searchable for term in subject_terms):
+        requested = []
+
+    if not requested:
+        scored: list[tuple[int, str]] = []
+        for field, value in entries.items():
+            score = sum(term in value.lower() for term in subject_terms)
+            if score:
+                scored.append((score, field))
+        requested = [field for _, field in sorted(scored, reverse=True)[:2]]
+
+    selected = [field for field in requested if entries.get(field)][:2]
+    evidence = [
+        {"field": field, "label": PRODUCT_KNOWLEDGE_LABELS[field], "value": entries[field]}
+        for field in selected
+    ]
+    grounding = {
+        "grounded": True,
+        "status": "supported" if evidence else "insufficient",
+        "source": "current_product_knowledge",
+        "source_label": "当前商品知识库",
+        "fields": [item["field"] for item in evidence],
+        "evidence": evidence,
+    }
+    if not evidence:
+        return "当前商品资料暂未说明这一点，请以商品详情页或客服确认为准。", grounding
+
+    selected_set = set(selected)
+    parts: list[str] = []
+    if "sale_price" in selected_set:
+        parts.append(f"当前直播价是{entries['sale_price']}")
+        if entries.get("original_price"):
+            parts.append(f"原价{entries['original_price']}")
+    elif "original_price" in selected_set:
+        parts.append(f"商品原价是{entries['original_price']}")
+    if "promotion" in selected_set:
+        parts.append(f"当前优惠是{entries['promotion']}")
+    if "params" in selected_set:
+        parts.append(f"商品参数显示：{entries['params']}")
+    if "selling_points" in selected_set:
+        parts.append(f"商品卖点是：{entries['selling_points']}")
+    if "link" in selected_set:
+        parts.append("可以点击直播间右侧商品卡进入详情页下单")
+    if "name" in selected_set:
+        parts.append(f"当前商品是{entries['name']}")
+    answer = "；".join(parts) or "当前商品资料暂未说明这一点，请以商品详情页或客服确认为准。"
+    return _compact_knowledge_value(answer, 110) + ("。" if not answer.endswith("。") else ""), grounding
 
 SCENE_TEMPLATES: dict[str, dict[str, str]] = {
     "3c": {"label": "3C直播间", "color": "2563eb", "accent": "38bdf8"},
@@ -1752,12 +1865,15 @@ def _reply_to_danmaku(session_id: str, interaction_id: str, question: str) -> No
             session = dict(_sessions[session_id])
             queue_item = dict(session["queue"][int(session.get("queue_index") or 0)])
         product = dict(queue_item["product"])
-        prompt = (
-            "你是电商直播数字人。只能依据当前商品事实回答，控制在60字以内；"
-            "资料没有的信息要明确说暂未说明，不得编造。当前商品事实：" + _product_facts(product)
+        _update_interaction(session_id, interaction_id, status="grounding")
+        answer, grounding = _grounded_product_answer(question, product)
+        _update_interaction(
+            session_id,
+            interaction_id,
+            status="speaking",
+            answer=answer,
+            grounding=grounding,
         )
-        answer = generate_reply(question, None, prompt)
-        _update_interaction(session_id, interaction_id, status="speaking", answer=answer)
         path = _session_path(session_id) / "interactions" / interaction_id
         path.mkdir(parents=True, exist_ok=True)
         with _GPU_LOCK:
@@ -1770,7 +1886,13 @@ def _reply_to_danmaku(session_id: str, interaction_id: str, question: str) -> No
             portrait = Path(session.get("portrait_normalized") or session.get("portrait_path") or FIXED_HOST)
             motion = animate_portrait(portrait, speech, path, session.get("expression_mode", "normal"))
             avatar = render_avatar(motion, speech, path)
-        plan = [{"stage": "answer", "action": "recommend", "emotion": "friendly", "text": answer}]
+        plan = [{
+            "stage": "answer",
+            "action": "recommend",
+            "emotion": "friendly",
+            "camera": "medium_close",
+            "text": answer,
+        }]
         video, timed = _compose_v1_scene(
             avatar,
             Path(queue_item["product_image"]),
@@ -1786,6 +1908,7 @@ def _reply_to_danmaku(session_id: str, interaction_id: str, question: str) -> No
             interaction_id,
             status="ready",
             answer=answer,
+            grounding=grounding,
             video_path=str(video),
             script_plan=timed,
             duration=round(_audio_duration(video), 3),
@@ -2464,7 +2587,7 @@ def ask_danmaku(session_id: str, request: DanmakuRequest) -> dict[str, Any]:
         session = _sessions.get(session_id)
         if not session or session.get("render_status") != "ready":
             raise HTTPException(status_code=409, detail="V1 直播尚未准备完成")
-        pending = sum(item.get("status") in {"queued", "thinking", "speaking"} for item in session.get("interactions", []))
+        pending = sum(item.get("status") in {"queued", "grounding", "thinking", "speaking"} for item in session.get("interactions", []))
         if pending >= 3:
             raise HTTPException(status_code=429, detail="数字人正在回答其他观众，请稍后再发")
         interaction = {

@@ -624,6 +624,14 @@ body.auth-mode .app { max-width: none; min-height: 100vh; margin: 0; padding: 0;
   .live-danmaku { left: 8px; width: 22%; max-width: 110px; }
 }
 .live-danmaku-item.host { background: rgba(65, 95, 255, .86); }
+.live-danmaku-item.knowledge { display: inline-flex; align-items: center; gap: 5px; }
+.live-danmaku-item.knowledge.supported { background: rgba(5, 150, 105, .88); }
+.live-danmaku-item.knowledge.insufficient { background: rgba(180, 83, 9, .88); }
+.live-knowledge-badge {
+  flex: 0 0 auto; padding: 1px 5px; border-radius: 999px;
+  background: rgba(255, 255, 255, .92); color: #065f46; font-size: 8px; font-weight: 800;
+}
+.live-danmaku-item.knowledge.insufficient .live-knowledge-badge { color: #92400e; }
 @keyframes danmakuIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
 .live-studio-panel {
   margin-top: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 16px;

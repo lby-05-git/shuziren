@@ -926,10 +926,10 @@
         if (liveVideo.readyState) liveVideo.currentTime = 0;
       }
       var pending = (session.interactions || []).find(function (item) {
-        return item.status === "queued" || item.status === "thinking" || item.status === "speaking";
+        return item.status === "queued" || item.status === "grounding" || item.status === "thinking" || item.status === "speaking";
       });
       if (pending) {
-        liveConnection.textContent = pending.status === "speaking" ? "正在生成数字人语音画面" : "LLM 正在思考";
+        liveConnection.textContent = pending.status === "speaking" ? "正在生成数字人语音画面" : "正在检索当前商品知识库";
       }
       (session.interactions || []).forEach(function (item) {
         if (!state.seenInteractions[item.id + "q"]) {
@@ -938,7 +938,7 @@
         }
         if (item.answer && !state.seenInteractions[item.id + "a"]) {
           state.seenInteractions[item.id + "a"] = true;
-          pushDanmaku("数字人：" + item.answer, true);
+          pushDanmaku("数字人：" + item.answer, true, item.grounding);
         }
         if (item.status === "ready" && item.video_url && !state.playedReplies[item.id]) {
           state.playedReplies[item.id] = true;
@@ -1215,16 +1215,27 @@
       document.getElementById("liveFollowBtn").classList.toggle("done", state.followed);
     }
 
-    function pushDanmaku(text, fromHost) {
+    function pushDanmaku(text, fromHost, grounding) {
       var box = document.getElementById("liveDanmaku");
       if (!box) return;
       var fullText = String(text || "").replace(/\s+/g, " ").trim();
       var chars = Array.from(fullText);
       var shortText = chars.length > 18 ? chars.slice(0, 18).join("") + "…" : fullText;
       var d = document.createElement("div");
-      d.className = "live-danmaku-item" + (fromHost ? " host" : "");
-      d.textContent = shortText;
-      d.title = fullText;
+      var groundingStatus = grounding && String(grounding.status || "");
+      d.className = "live-danmaku-item" + (fromHost ? " host" : "") + (groundingStatus ? " knowledge " + groundingStatus : "");
+      if (groundingStatus) {
+        var badge = document.createElement("span");
+        badge.className = "live-knowledge-badge";
+        badge.textContent = groundingStatus === "supported" ? "知识库" : "资料不足";
+        d.appendChild(badge);
+        d.appendChild(document.createTextNode(shortText));
+        var labels = (grounding.evidence || []).map(function (item) { return item.label; }).filter(Boolean);
+        d.title = fullText + (labels.length ? " · 依据：" + labels.join("、") : " · 当前商品资料未覆盖");
+      } else {
+        d.textContent = shortText;
+        d.title = fullText;
+      }
       box.appendChild(d);
       while (box.children.length > 4) box.removeChild(box.firstChild);
     }
@@ -1429,7 +1440,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: text, user: maskedAccount(currentAccount) || "商城用户" })
       }).then(function () {
-        toast("弹幕已发送，数字人正在生成回答");
+        toast("弹幕已发送，正在检索商品知识库并生成回答");
         pollDigitalHuman();
       }).catch(function (error) { toast(error.message); });
     };
